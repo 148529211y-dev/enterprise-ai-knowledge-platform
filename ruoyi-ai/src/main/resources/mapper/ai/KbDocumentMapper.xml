@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.KbDocumentMapper">
+
+    <select id="selectById" parameterType="Long" resultType="com.ruoyi.ai.entity.KbDocument">
+        SELECT * FROM kb_document WHERE id = #{id}
+    </select>
+
+    <select id="selectList" parameterType="com.ruoyi.ai.entity.KbDocument" resultType="com.ruoyi.ai.entity.KbDocument">
+        SELECT * FROM kb_document
+        <where>
+            <if test="title != null and title != ''">AND title LIKE CONCAT('%', #{title}, '%')</if>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="createBy != null and createBy != ''">AND create_by = #{createBy}</if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <insert id="insert" parameterType="com.ruoyi.ai.entity.KbDocument" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO kb_document (title, file_path, file_type, file_size, content, chunk_count, status, create_by, create_time)
+        VALUES (#{title}, #{filePath}, #{fileType}, #{fileSize}, #{content}, #{chunkCount}, #{status}, #{createBy}, sysdate())
+    </insert>
+
+    <update id="update" parameterType="com.ruoyi.ai.entity.KbDocument">
+        UPDATE kb_document
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="chunkCount != null">chunk_count = #{chunkCount},</if>
+            <if test="status != null">status = #{status},</if>
+            update_time = sysdate()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="Long">
+        DELETE FROM kb_document WHERE id = #{id}
+    </delete>
+</mapper>

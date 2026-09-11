@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.KbChunkMapper">
+
+    <insert id="insertBatch">
+        INSERT INTO kb_chunk (doc_id, chunk_index, content, token_count, create_time) VALUES
+        <foreach collection="list" item="c" separator=",">
+            (#{c.docId}, #{c.chunkIndex}, #{c.content}, #{c.tokenCount}, sysdate())
+        </foreach>
+    </insert>
+
+    <select id="selectByDocId" parameterType="Long" resultType="com.ruoyi.ai.entity.KbChunk">
+        SELECT * FROM kb_chunk WHERE doc_id = #{docId} ORDER BY chunk_index
+    </select>
+
+    <delete id="deleteByDocId" parameterType="Long">
+        DELETE FROM kb_chunk WHERE doc_id = #{docId}
+    </delete>
+
+    <select id="selectAll" resultType="com.ruoyi.ai.entity.KbChunk">
+        SELECT * FROM kb_chunk ORDER BY doc_id, chunk_index
+    </select>
+</mapper>
