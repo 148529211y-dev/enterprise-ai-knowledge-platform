@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.ai.config.AiConfig;
+import com.ruoyi.ai.service.EmbeddingService;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,18 +20,18 @@ import java.util.concurrent.TimeUnit;
  * Embedding 向量化服务
  *
  * 面试知识点：
- * 1. 什么是 Embedding？ —— 将文本映射为高维向量，语义相近的文本向量距离更近
- * 2. 为什么需要向量化？ —— 传统关键词匹配无法理解语义（"请假"vs"休假申请"）
- * 3. 为什么不用 MySQL 做向量检索？ —— MySQL 不支持高效的高维向量相似度计算
+ * 1. 什么是 Embedding？—— 将文本映射为高维向量，语义相近的文本向量距离更近
+ * 2. 为什么需要向量化？—— 传统关键词匹配无法理解语义（"请假" vs "休假申请"）
+ * 3. 为什么不用 MySQL 做向量检索？—— MySQL 不支持高效的高维向量相似度计算
  */
 @Service
-public class EmbeddingService {
+public class EmbeddingServiceImpl implements EmbeddingService {
 
-    private static final Logger log = LoggerFactory.getLogger(EmbeddingService.class);
+    private static final Logger log = LoggerFactory.getLogger(EmbeddingServiceImpl.class);
     private final AiConfig config;
     private final OkHttpClient httpClient;
 
-    public EmbeddingService(AiConfig config) {
+    public EmbeddingServiceImpl(AiConfig config) {
         this.config = config;
         this.httpClient = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
@@ -41,6 +42,7 @@ public class EmbeddingService {
     /**
      * 将单条文本转为向量
      */
+    @Override
     public float[] embed(String text) {
         List<float[]> results = embedBatch(Collections.singletonList(text));
         return results.isEmpty() ? new float[0] : results.get(0);
@@ -53,6 +55,7 @@ public class EmbeddingService {
      * Request:  { "model": "...", "input": ["text1", "text2"] }
      * Response: { "data": [{ "embedding": [0.1, ...] }] }
      */
+    @Override
     public List<float[]> embedBatch(List<String> texts) {
         String url = resolveBaseUrl() + "/v1/embeddings";
 

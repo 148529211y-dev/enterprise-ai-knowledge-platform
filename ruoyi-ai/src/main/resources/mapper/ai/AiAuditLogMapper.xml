@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.AiAuditLogMapper">
+
+    <insert id="insert" parameterType="com.ruoyi.ai.entity.AiAuditLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_audit_log (user_id, session_id, operation_type, question, tool_name,
+            tool_args, answer, token_count, response_time, status, error_message, create_time)
+        VALUES (#{userId}, #{sessionId}, #{operationType}, #{question}, #{toolName},
+            #{toolArgs}, #{answer}, #{tokenCount}, #{responseTime}, #{status}, #{errorMessage}, sysdate())
+    </insert>
+</mapper>

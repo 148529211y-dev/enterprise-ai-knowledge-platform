@@ -2,6 +2,8 @@ package com.ruoyi.ai.service.impl;
 
 import com.ruoyi.ai.entity.KbChunk;
 import com.ruoyi.ai.mapper.KbChunkMapper;
+import com.ruoyi.ai.service.EmbeddingService;
+import com.ruoyi.ai.service.VectorStoreService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -16,23 +18,23 @@ import java.util.stream.Collectors;
  *
  * 设计说明（面试要点）：
  *
- * Q: 为什么用向量数据库而不是 MySQL 直接查？
+ * Q: 为什么用向量数据库而不用 MySQL 直接查？
  * A: MySQL 擅长结构化查询（WHERE name = '张三'），但无法高效做"语义相似度搜索"。
  *    向量数据库（如 Qdrant/Milvus）专门优化了高维向量的近似最近邻(ANN)检索。
  *    本项目为演示目的使用内存向量 + 余弦相似度，生产环境应切换为 Qdrant。
  *
  * Q: 为什么选 Qdrant？
- * A: 1. Rust 实现，性能好   2. Spring AI 原生支持
- *    3. 单容器部署简单      4. 社区活跃
+ * A: 1. Rust 实现，性能好  2. Spring AI 原生支持
+ *    3. 单容器部署简单     4. 社区活跃
  *
  * 架构：
  *   MySQL → 持久化文档元数据和切片文本（保证数据不丢失）
  *   内存  → 缓存向量用于快速检索（启动时从 MySQL 加载）
  */
 @Service
-public class VectorStoreService {
+public class VectorStoreServiceImpl implements VectorStoreService {
 
-    private static final Logger log = LoggerFactory.getLogger(VectorStoreService.class);
+    private static final Logger log = LoggerFactory.getLogger(VectorStoreServiceImpl.class);
 
     /**
      * 内存向量索引：chunkId → 向量
@@ -46,9 +48,9 @@ public class VectorStoreService {
     private final ConcurrentHashMap<Long, ChunkEntry> chunkCache = new ConcurrentHashMap<>();
 
     private final KbChunkMapper chunkMapper;
-    private final EmbeddingService embeddingService;
+    private final EmbeddingServiceImpl embeddingService;
 
-    public VectorStoreService(KbChunkMapper chunkMapper, EmbeddingService embeddingService) {
+    public VectorStoreServiceImpl(KbChunkMapper chunkMapper, EmbeddingServiceImpl embeddingService) {
         this.chunkMapper = chunkMapper;
         this.embeddingService = embeddingService;
     }
@@ -58,7 +60,7 @@ public class VectorStoreService {
      */
     @PostConstruct
     public void init() {
-        log.info("向量存储服务初始化...");
+        log.info("向量存储服务初始化中...");
         // 启动时暂不加载，按需向量化
     }
 
@@ -68,6 +70,7 @@ public class VectorStoreService {
      * @param chunks  从数据库读取的切片列表
      * @param vectors 对应的向量列表
      */
+    @Override
     public void store(List<KbChunk> chunks, List<float[]> vectors) {
         for (int i = 0; i < chunks.size(); i++) {
             KbChunk chunk = chunks.get(i);
@@ -88,6 +91,7 @@ public class VectorStoreService {
      *   - K 太大：引入噪声，消耗 token
      *   本项目默认 K=3
      */
+    @Override
     public List<SearchResult> search(float[] queryVector, int topK) {
         if (vectorIndex.isEmpty()) {
             return Collections.emptyList();
@@ -111,6 +115,7 @@ public class VectorStoreService {
     /**
      * 删除某文档的所有向量
      */
+    @Override
     public void removeByDocId(Long docId) {
         List<Long> toRemove = new ArrayList<>();
         for (Map.Entry<Long, ChunkEntry> entry : chunkCache.entrySet()) {
@@ -125,6 +130,7 @@ public class VectorStoreService {
         log.info("已移除文档 {} 的 {} 个向量", docId, toRemove.size());
     }
 
+    @Override
     public int getVectorCount() {
         return vectorIndex.size();
     }
@@ -139,25 +145,6 @@ public class VectorStoreService {
 
         ChunkEntry(Long id, Long docId, Integer index, String content) {
             this.id = id; this.docId = docId; this.index = index; this.content = content;
-        }
-    }
-
-    /**
-     * 检索结果
-     */
-    public static class SearchResult {
-        public final Long docId;
-        public final String content;
-        public final double score;
-
-        public SearchResult(Long docId, String content, double score) {
-            this.docId = docId; this.content = content; this.score = score;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("[doc=%d, score=%.4f, content=%s]", docId, score,
-                    content.length() > 50 ? content.substring(0, 50) + "..." : content);
         }
     }
 }

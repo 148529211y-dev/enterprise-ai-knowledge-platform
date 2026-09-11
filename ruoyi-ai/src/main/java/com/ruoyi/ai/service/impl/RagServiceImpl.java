@@ -3,6 +3,9 @@ package com.ruoyi.ai.service.impl;
 import com.ruoyi.ai.entity.AiConversation;
 import com.ruoyi.ai.mapper.AiConversationMapper;
 import com.ruoyi.ai.domain.dto.ChatResponse;
+import com.ruoyi.ai.service.EmbeddingService;
+import com.ruoyi.ai.service.RagService;
+import com.ruoyi.ai.service.VectorStoreService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -30,33 +33,32 @@ import java.util.*;
  * 面试知识点：
  *   Q: 如何解决 LLM 幻觉问题？
  *   A: 1. RAG 提供真实文档作为上下文，约束 LLM 基于事实回答
- *      2. Prompt 中明确要求"仅根据以下文档回答，如无相关信息请说明"
+ *      2. Prompt 中明确要求「仅根据以下文档回答，如无相关信息请说明」
  *      3. 设置低 temperature（0.3）减少随机性
  *      4. 返回引用来源，用户可自行验证
  */
 @Service
-public class RagService {
+public class RagServiceImpl implements RagService {
 
-    private static final Logger log = LoggerFactory.getLogger(RagService.class);
+    private static final Logger log = LoggerFactory.getLogger(RagServiceImpl.class);
 
     /** RAG 系统提示词 */
     private static final String RAG_SYSTEM_PROMPT = """
             你是一个企业知识库问答助手。请严格根据以下提供的文档内容回答用户问题。
-            
             规则：
             1. 仅根据提供的文档内容回答，不要编造信息
-            2. 如果文档中没有相关信息，请明确告知用户"根据现有知识库，未找到相关信息"
+            2. 如果文档中没有相关信息，请明确告知用户「根据现有知识库，未找到相关信息」
             3. 回答时请引用具体的文档片段作为依据
             4. 回答要简洁、准确、专业
             """;
 
-    private final EmbeddingService embeddingService;
-    private final VectorStoreService vectorStore;
-    private final LlmService llmService;
+    private final EmbeddingServiceImpl embeddingService;
+    private final VectorStoreServiceImpl vectorStore;
+    private final LlmServiceImpl llmService;
     private final AiConversationMapper conversationMapper;
 
-    public RagService(EmbeddingService embeddingService, VectorStoreService vectorStore,
-                      LlmService llmService, AiConversationMapper conversationMapper) {
+    public RagServiceImpl(EmbeddingServiceImpl embeddingService, VectorStoreServiceImpl vectorStore,
+                          LlmServiceImpl llmService, AiConversationMapper conversationMapper) {
         this.embeddingService = embeddingService;
         this.vectorStore = vectorStore;
         this.llmService = llmService;
@@ -66,6 +68,7 @@ public class RagService {
     /**
      * RAG 问答主流程
      */
+    @Override
     public ChatResponse ask(Long userId, String sessionId, String question) {
         log.info("RAG问答: userId={}, question={}", userId, question);
 

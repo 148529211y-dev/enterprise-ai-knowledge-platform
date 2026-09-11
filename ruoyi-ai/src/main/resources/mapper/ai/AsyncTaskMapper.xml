@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.AsyncTaskMapper">
+
+    <insert id="insert" parameterType="com.ruoyi.ai.entity.AsyncTask" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_async_task (task_id, task_type, biz_id, status, progress, create_by, create_time, update_time)
+        VALUES (#{taskId}, #{taskType}, #{bizId}, #{status}, #{progress}, #{createBy}, sysdate(), sysdate())
+    </insert>
+
+    <select id="selectByTaskId" parameterType="String" resultType="com.ruoyi.ai.entity.AsyncTask">
+        SELECT * FROM ai_async_task WHERE task_id = #{taskId}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE ai_async_task
+        SET status = #{status}, progress = #{progress}, error_message = #{errorMessage}, update_time = sysdate()
+        WHERE task_id = #{taskId}
+    </update>
+</mapper>

@@ -4,6 +4,9 @@ import com.ruoyi.ai.entity.KbChunk;
 import com.ruoyi.ai.entity.KbDocument;
 import com.ruoyi.ai.mapper.KbChunkMapper;
 import com.ruoyi.ai.mapper.KbDocumentMapper;
+import com.ruoyi.ai.domain.query.KbDocumentQuery;
+import com.ruoyi.ai.service.KbService;
+import com.ruoyi.common.core.domain.AjaxResult;
 import org.apache.tika.Tika;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,16 +28,16 @@ import java.util.regex.Pattern;
  *
  * 职责：文档上传 → 文本解析 → 文本切片 → 调用 Embedding → 存入向量索引
  *
- * 面试知识点 —— Chunk 切片策略：
+ * 面试知识 —— Chunk 切片策略：
  *   1. 按段落切分：以 \n\n 为界，保持语义完整性（本项目采用）
  *   2. 固定 Token 数切分：每 N 个 token 切一刀，简单但可能截断语义
  *   3. 滑动窗口：相邻切片有重叠，保证上下文连贯
  *   本项目采用「按段落 + 最大长度限制 + 重叠」的混合策略
  */
 @Service
-public class KbService {
+public class KbServiceImpl implements KbService {
 
-    private static final Logger log = LoggerFactory.getLogger(KbService.class);
+    private static final Logger log = LoggerFactory.getLogger(KbServiceImpl.class);
 
     /** 单个切片最大字符数 */
     private static final int MAX_CHUNK_SIZE = 500;
@@ -43,15 +46,15 @@ public class KbService {
 
     private final KbDocumentMapper docMapper;
     private final KbChunkMapper chunkMapper;
-    private final EmbeddingService embeddingService;
-    private final VectorStoreService vectorStore;
+    private final EmbeddingServiceImpl embeddingService;
+    private final VectorStoreServiceImpl vectorStore;
     private final Tika tika = new Tika();
 
     /** 文件上传根目录 */
     private final String uploadDir;
 
-    public KbService(KbDocumentMapper docMapper, KbChunkMapper chunkMapper,
-                     EmbeddingService embeddingService, VectorStoreService vectorStore) {
+    public KbServiceImpl(KbDocumentMapper docMapper, KbChunkMapper chunkMapper,
+                         EmbeddingServiceImpl embeddingService, VectorStoreServiceImpl vectorStore) {
         this.docMapper = docMapper;
         this.chunkMapper = chunkMapper;
         this.embeddingService = embeddingService;
@@ -62,10 +65,19 @@ public class KbService {
     /**
      * 文档列表查询
      */
-    public List<KbDocument> listDocuments(KbDocument query) {
-        return docMapper.selectList(query);
+    @Override
+    public List<KbDocument> listDocuments(KbDocumentQuery query) {
+        // Query → Entity 转换（Mapper 层保持接收 Entity）
+        KbDocument entity = new KbDocument();
+        if (query != null) {
+            entity.setTitle(query.getTitle());
+            entity.setStatus(query.getStatus());
+            entity.setCreateBy(query.getCreateBy());
+        }
+        return docMapper.selectList(entity);
     }
 
+    @Override
     public KbDocument getById(Long id) {
         return docMapper.selectById(id);
     }
@@ -75,8 +87,9 @@ public class KbService {
      *
      * 流程：上传 → 解析 → 切片 → Embedding → 存储
      */
+    @Override
     @Transactional
-    public KbDocument uploadAndProcess(MultipartFile file, String title, String createBy) throws Exception {
+    public AjaxResult uploadAndProcess(MultipartFile file, String title, String createBy) throws Exception {
         // 1. 文件存储
         String originalName = file.getOriginalFilename();
         String fileType = getFileExtension(originalName);
@@ -98,7 +111,7 @@ public class KbService {
         doc.setStatus(0); // 待处理
         docMapper.insert(doc);
 
-        // 3. 异步处理（解析 → 切片 → 向量化）
+        // 3. 处理文档（解析 → 切片 → 向量化）
         try {
             processDocument(doc);
         } catch (Exception e) {
@@ -108,12 +121,13 @@ public class KbService {
             throw e;
         }
 
-        return doc;
+        return AjaxResult.success("文档上传成功", doc);
     }
 
     /**
      * 文档处理核心流程
      */
+    @Override
     @Transactional
     public void processDocument(KbDocument doc) throws Exception {
         // 1. 文本解析（Apache Tika）
@@ -170,6 +184,7 @@ public class KbService {
     /**
      * 删除文档及其切片和向量
      */
+    @Override
     @Transactional
     public void deleteDocument(Long docId) {
         vectorStore.removeByDocId(docId);
@@ -208,7 +223,7 @@ public class KbService {
      * 策略说明（面试要点）：
      * 1. 优先按段落（\n\n）切分，保持语义完整性
      * 2. 超长段落按 MAX_CHUNK_SIZE 再切，避免单片过大
-     * 3. 相邻切片有 OVERLAP_SIZE 字符重叠，保证上下文连贯
+     * 3. 相邻切片保留 OVERLAP_SIZE 字符重叠，保证上下文连贯
      */
     private List<String> chunkText(String text) {
         List<String> chunks = new ArrayList<>();
@@ -250,7 +265,7 @@ public class KbService {
         return chunks;
     }
 
-    /** 超长文本按句号/换行再切 */
+    /** 超长文本按句号换行再切 */
     private List<String> splitLongText(String text) {
         List<String> result = new ArrayList<>();
         int start = 0;

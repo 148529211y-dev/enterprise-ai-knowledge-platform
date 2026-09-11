@@ -2,12 +2,15 @@ package com.ruoyi.ai.controller;
 
 import com.ruoyi.ai.domain.dto.ChatRequest;
 import com.ruoyi.ai.domain.dto.ChatResponse;
-import com.ruoyi.ai.service.impl.AgentService;
-import com.ruoyi.ai.service.impl.LlmService;
-import com.ruoyi.ai.service.impl.RagService;
+import com.ruoyi.ai.entity.AiAuditLog;
+import com.ruoyi.ai.mapper.AiAuditLogMapper;
+import com.ruoyi.ai.service.AgentService;
+import com.ruoyi.ai.service.LlmService;
+import com.ruoyi.ai.service.RagService;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.utils.SecurityUtils;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
  *   1. chat  —— 普通对话（直接调 LLM）
  *   2. rag   —— 知识库问答（检索 + 生成）
  *   3. agent —— 智能助手（LLM + 工具调用）
+ *
+ * 每次调用都会记录审计日志（AiAuditLog），满足央国企审计要求。
  */
 @RestController
 @RequestMapping("/ai/chat")
@@ -29,28 +34,34 @@ public class AiController extends BaseController {
     private final LlmService llmService;
     private final RagService ragService;
     private final AgentService agentService;
+    private final AiAuditLogMapper auditLogMapper;
 
-    public AiController(LlmService llmService, RagService ragService, AgentService agentService) {
+    public AiController(LlmService llmService, RagService ragService,
+                        AgentService agentService, AiAuditLogMapper auditLogMapper) {
         this.llmService = llmService;
         this.ragService = ragService;
         this.agentService = agentService;
+        this.auditLogMapper = auditLogMapper;
     }
 
     /**
-     * 统一聊天入口 —— 根据 mode 分发到不同处理链路
+     * 统一聊天入口 —— @Valid 触发参数校验
      */
     @PostMapping
-    public AjaxResult chat(@RequestBody ChatRequest request) {
+    public AjaxResult chat(@Valid @RequestBody ChatRequest request) {
         Long userId = SecurityUtils.getUserId();
         String sessionId = request.getSessionId();
         String message = request.getMessage();
         String mode = request.getMode();
 
-        if (message == null || message.trim().isEmpty()) {
-            return AjaxResult.error("消息不能为空");
-        }
-
         log.info("收到聊天请求: userId={}, mode={}, message={}", userId, mode, message);
+
+        long startTime = System.currentTimeMillis();
+        AiAuditLog auditLog = new AiAuditLog();
+        auditLog.setUserId(userId);
+        auditLog.setSessionId(sessionId);
+        auditLog.setOperationType(mode);
+        auditLog.setQuestion(message);
 
         try {
             ChatResponse response;
@@ -62,17 +73,32 @@ public class AiController extends BaseController {
                     response = agentService.chat(userId, sessionId, message);
                     break;
                 default:
-                    // 普通对话
                     String reply = llmService.chat(null, message);
                     response = new ChatResponse();
                     response.setReply(reply);
                     response.setMode("chat");
                     break;
             }
+
+            // 记录成功日志
+            long duration = System.currentTimeMillis() - startTime;
+            auditLog.setAnswer(response.getReply() != null && response.getReply().length() > 500
+                    ? response.getReply().substring(0, 500) : response.getReply());
+            auditLog.setResponseTime(duration);
+            auditLog.setStatus(1);
+            auditLogMapper.insert(auditLog);
+
             return AjaxResult.success(response);
         } catch (Exception e) {
+            // 记录失败日志
+            long duration = System.currentTimeMillis() - startTime;
+            auditLog.setResponseTime(duration);
+            auditLog.setStatus(0);
+            auditLog.setErrorMessage(e.getMessage());
+            auditLogMapper.insert(auditLog);
+
             log.error("聊天处理异常: mode={}", mode, e);
-            return AjaxResult.error("处理失败: " + e.getMessage());
+            throw e; // 交给全局异常处理器
         }
     }
 }

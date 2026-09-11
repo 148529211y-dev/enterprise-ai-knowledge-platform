@@ -8,6 +8,7 @@ import com.ruoyi.ai.mapper.AiConversationMapper;
 import com.ruoyi.ai.domain.dto.ChatResponse;
 import com.ruoyi.ai.tool.ToolRegistry;
 import com.ruoyi.ai.config.AiConfig;
+import com.ruoyi.ai.service.AgentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -18,7 +19,6 @@ import java.util.*;
  * Agent 智能助手服务
  *
  * 面试知识点 —— Agent 架构：
- *
  *   Agent = LLM + Memory + Tools
  *
  *   1. LLM（大脑）：理解用户意图，推理需要调用哪些工具，整合结果生成回答
@@ -28,7 +28,7 @@ import java.util.*;
  *   为什么用 Agent 而不是普通接口？
  *   - 普通接口：用户必须知道调用哪个接口、传什么参数
  *   - Agent：用户说自然语言，Agent 自动判断需要什么工具、怎么调用
- *   - Agent 能组合多个工具完成复杂任务（如"帮我查张三的部门负责人"需要调用两个工具）
+ *   - Agent 能组合多个工具完成复杂任务（如「帮我查张三的部门负责人」需要调用两个工具）
  *
  * Function Calling 流程：
  *   用户消息 + 工具定义 → LLM
@@ -37,13 +37,12 @@ import java.util.*;
  *   LLM 整合结果，生成最终回答
  */
 @Service
-public class AgentService {
+public class AgentServiceImpl implements AgentService {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentService.class);
+    private static final Logger log = LoggerFactory.getLogger(AgentServiceImpl.class);
 
     private static final String AGENT_SYSTEM_PROMPT = """
             你是一个企业智能办公助手。你可以帮助用户查询员工信息、部门信息，以及搜索企业知识库。
-            
             规则：
             1. 根据用户的意图，判断是否需要调用工具
             2. 如果需要工具，使用提供的工具来获取准确信息，不要编造数据
@@ -52,7 +51,7 @@ public class AgentService {
             5. 如果工具返回了结果，基于结果给出清晰的总结
             """;
 
-    private final LlmService llmService;
+    private final LlmServiceImpl llmService;
     private final ToolRegistry toolRegistry;
     private final AiConversationMapper conversationMapper;
     private final AiConfig aiConfig;
@@ -60,8 +59,8 @@ public class AgentService {
     /** 最大工具调用轮次，防止无限循环 */
     private static final int MAX_TOOL_ROUNDS = 5;
 
-    public AgentService(LlmService llmService, ToolRegistry toolRegistry,
-                        AiConversationMapper conversationMapper, AiConfig aiConfig) {
+    public AgentServiceImpl(LlmServiceImpl llmService, ToolRegistry toolRegistry,
+                            AiConversationMapper conversationMapper, AiConfig aiConfig) {
         this.llmService = llmService;
         this.toolRegistry = toolRegistry;
         this.conversationMapper = conversationMapper;
@@ -71,6 +70,7 @@ public class AgentService {
     /**
      * Agent 对话主流程
      */
+    @Override
     public ChatResponse chat(Long userId, String sessionId, String userMessage) {
         log.info("Agent对话: userId={}, message={}", userId, userMessage);
 

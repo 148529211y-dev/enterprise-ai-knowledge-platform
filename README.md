@@ -1,115 +1,284 @@
-<p align="center">
-	<img alt="logo" src="https://oscimg.oschina.net/oscnet/up-d3d0a9303e11d522a06cd263f3079027715.png">
-</p>
-<h1 align="center" style="margin: 30px 0 30px; font-weight: bold;">RuoYi v3.9.2</h1>
-<h4 align="center">基于SpringBoot+Vue前后端分离的Java快速开发框架</h4>
-<p align="center">
-	<a href="https://gitee.com/y_project/RuoYi-Vue/stargazers"><img src="https://gitee.com/y_project/RuoYi-Vue/badge/star.svg?theme=dark"></a>
-	<a href="https://gitee.com/y_project/RuoYi-Vue"><img src="https://img.shields.io/badge/RuoYi-v3.9.2-brightgreen.svg"></a>
-	<a href="https://gitee.com/y_project/RuoYi-Vue/blob/master/LICENSE"><img src="https://img.shields.io/github/license/mashape/apistatus.svg"></a>
-</p>
+# 企业智能知识管理与Agent辅助办公平台
 
-## 平台简介
+> 基于 RuoYi-Vue 二次开发，集成 RAG 知识问答与 Agent 智能助手的企业级信息化平台
 
-若依是一套全部开源的快速开发平台，毫无保留给个人及企业免费使用。
+## 一、项目背景
 
-* 前端采用Vue、Element UI。
-* 后端采用Spring Boot、Spring Security、Redis & Jwt。
-* 权限认证使用Jwt，支持多终端认证系统。
-* 支持加载动态权限菜单，多方式轻松权限控制。
-* 高效率开发，使用代码生成器可以一键生成前后端代码。
-* 阿里云折扣场：[点我进入](http://aly.ruoyi.vip)，腾讯云秒杀场：[点我进入](http://txy.ruoyi.vip)&nbsp;&nbsp;
+企业内部数字化办公场景中，员工面临以下痛点：
 
-# 版本分支
+- 制度文档查询困难，散落在不同系统
+- 项目资料分散，信息检索效率低
+- 重复咨询成本高，新员工培训周期长
 
-RuoYi-Vue 后端项目提供 Spring Boot 2.x / 3.x / 4.x 多版本分支的并行维护。
+本平台在成熟的企业后台管理系统基础上，集成 AI 能力，实现：
 
-| 名称              | 说明                      | 地址                                                    |
-| :---------------- | :------------------------ | :------------------------------------------------------ |
-| master 默认分支   | Spring Boot 4.x (JDK 17+) | https://gitee.com/y_project/RuoYi-Vue                   |
-| springboot3 分支  | Spring Boot 3.x (JDK 17+) | https://gitee.com/y_project/RuoYi-Vue/tree/springboot3  |
-| springboot2 分支  | Spring Boot 2.x (JDK 8+)  | https://gitee.com/y_project/RuoYi-Vue/tree/springboot2  |  
+```
+用户登录 → 权限管理 → 知识库管理 → 文档解析 → 知识检索 → Agent智能问答 → 业务工具调用 → 结果返回
+```
 
-RuoYi-Vue 前端项目提供 Vue 2.x / 3.x / JavaScript TypeScript 版本均可混用搭配
+## 二、系统架构
 
-| 项目名称      | **RuoYi-Vue** | **RuoYi-Vue3** | **RuoYi-Vue3-TypeScript**   |
-| :---          | :---          | :---           | :---                        |
-| **前端框架**  | Vue 2        | Vue 3          | Vue 3                       |
-| **脚本语言**  | JavaScript   | JavaScript     | TypeScript                  |
-| **构建工具**  | Vue CLI      | Vite           | Vite                        |
-| **UI 组件库** | Element UI   | Element Plus   | Element Plus                |
-| **状态管理**  | Vuex         | Pinia          | Pinia                       |
-| **路由管理**  | Vue Router 3 | Vue Router 4   | Vue Router 4                |
-| **核心特点**  | 1. 技术栈经典稳定<br>2. 社区资料丰富<br>3. 当前维护重心已转移 | 1. 现代前端技术栈<br>2. 开发体验与性能更优<br>3. 官方主推的活跃版本 | 1. 类型加持，减少沟通成本<br>2. 开发时有提示，效率更高<br>3. 多人协作企业级开发项目 |
-| **仓库地址**  | [RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue) | [RuoYi-Vue3](https://gitcode.com/yangzongzhuan/RuoYi-Vue3) | [RuoYi-Vue3-TypeScript](https://gitcode.com/yangzongzhuan/RuoYi-Vue3/tree/typescript) |
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    前端 (Vue 2 + Element UI)                 │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────────┐  │
+│  │ 系统管理  │ │ 知识库    │ │ AI问答    │ │ Agent助手     │  │
+│  └──────────┘ └──────────┘ └──────────┘ └───────────────┘  │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ HTTP/REST
+┌─────────────────────────┴───────────────────────────────────┐
+│                  Spring Boot Application                     │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │                  Controller Layer                     │    │
+│  │   SysController │ KbController │ AiController        │    │
+│  └───────────────────────┬─────────────────────────────┘    │
+│  ┌───────────────────────┴─────────────────────────────┐    │
+│  │                  Service Layer (接口 + 实现)          │    │
+│  │  ┌──────────┐ ┌──────────┐ ┌────────────────────┐  │    │
+│  │  │ 系统服务  │ │ 知识库    │ │ AI Service         │  │    │
+│  │  │(若依原生) │ │ KbService│ │ ┌────────────────┐ │  │    │
+│  │  └──────────┘ └──────────┘ │ │RagService      │ │  │    │
+│  │                             │ ├────────────────┤ │  │    │
+│  │                             │ │AgentService    │ │  │    │
+│  │                             │ ├────────────────┤ │  │    │
+│  │                             │ │LlmService      │ │  │    │
+│  │                             │ ├────────────────┤ │  │    │
+│  │                             │ │EmbeddingService│ │  │    │
+│  │                             │ └────────────────┘ │  │    │
+│  │                             └────────────────────┘  │    │
+│  └───────────────────────┬─────────────────────────────┘    │
+│  ┌───────────────────────┴─────────────────────────────┐    │
+│  │              Tool Layer (Agent工具)                   │    │
+│  │  EmployeeTool │ DepartmentTool │ KnowledgeTool       │    │
+│  └─────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │              Data Access Layer                       │    │
+│  │  ┌──────┐ ┌───────┐ ┌──────────┐ ┌──────────────┐ │    │
+│  │  │MySQL │ │Redis  │ │DeepSeek  │ │VectorStore   │ │    │
+│  │  └──────┘ └───────┘ └──────────┘ └──────────────┘ │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
 
-## 内置功能
+## 三、技术栈
 
-1.  用户管理：用户是系统操作者，该功能主要完成系统用户配置。
-2.  部门管理：配置系统组织机构（公司、部门、小组），树结构展现支持数据权限。
-3.  岗位管理：配置系统用户所属担任职务。
-4.  菜单管理：配置系统菜单，操作权限，按钮权限标识等。
-5.  角色管理：角色菜单权限分配、设置角色按机构进行数据范围权限划分。
-6.  字典管理：对系统中经常使用的一些较为固定的数据进行维护。
-7.  参数管理：对系统动态配置常用参数。
-8.  通知公告：系统通知公告信息发布维护。
-9.  操作日志：系统正常操作日志记录和查询；系统异常信息日志记录和查询。
-10. 登录日志：系统登录日志记录查询包含登录异常。
-11. 在线用户：当前系统中活跃用户状态监控。
-12. 定时任务：在线（添加、修改、删除)任务调度包含执行结果日志。
-13. 代码生成：前后端代码的生成（java、html、xml、sql）支持CRUD下载 。
-14. 系统接口：根据业务代码自动生成相关的api接口文档。
-15. 服务监控：监视当前系统CPU、内存、磁盘、堆栈等相关信息。
-16. 缓存监控：对系统的缓存信息查询，命令统计等。
-17. 在线构建器：拖动表单元素生成相应的HTML代码。
-18. 连接池监视：监视当前系统数据库连接池状态，可进行分析SQL找出系统性能瓶颈。
+| 层次 | 技术 | 说明 |
+|------|------|------|
+| 后端框架 | Spring Boot 4.1 + Spring Security | 若依基础框架 |
+| ORM | MyBatis + PageHelper | 数据持久化 |
+| 数据库 | MySQL 8.4 | 业务数据 + 对话历史 |
+| 缓存 | Redis | 会话缓存、Token管理 |
+| HTTP客户端 | OkHttp 4.12 | 调用LLM API |
+| 文档解析 | Apache Tika 2.9 | PDF/Word/MD解析 |
+| AI模型 | DeepSeek API / Ollama | 聊天 + Embedding |
+| 向量检索 | 内存向量索引 + 余弦相似度 | 可切换Qdrant |
+| 前端 | Vue 2 + Element UI | 若依前端框架 |
+| 部署 | Docker + Nginx | 容器化部署 |
 
-## 在线体验
+## 四、核心模块
 
-- admin/admin123  
-- 陆陆续续收到一些打赏，为了更好的体验已用于演示服务器升级。谢谢各位小伙伴。
+### 4.1 用户权限管理（若依基础）
 
-演示地址：http://vue.ruoyi.vip  
-文档地址：http://doc.ruoyi.vip
+- RBAC 权限模型：用户 → 角色 → 权限
+- JWT Token 认证
+- 数据权限（部门级数据隔离）
+- 操作日志审计
 
-## 演示图
+### 4.2 知识库管理
 
-<table>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/cd1f90be5f2684f4560c9519c0f2a232ee8.jpg"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/1cbcf0e6f257c7d3a063c0e3f2ff989e4b3.jpg"/></td>
-    </tr>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-8074972883b5ba0622e13246738ebba237a.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-9f88719cdfca9af2e58b352a20e23d43b12.png"/></td>
-    </tr>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-39bf2584ec3a529b0d5a3b70d15c9b37646.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-936ec82d1f4872e1bc980927654b6007307.png"/></td>
-    </tr>
-	<tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-b2d62ceb95d2dd9b3fbe157bb70d26001e9.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-d67451d308b7a79ad6819723396f7c3d77a.png"/></td>
-    </tr>	 
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/5e8c387724954459291aafd5eb52b456f53.jpg"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/644e78da53c2e92a95dfda4f76e6d117c4b.jpg"/></td>
-    </tr>
-	<tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-8370a0d02977eebf6dbf854c8450293c937.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-49003ed83f60f633e7153609a53a2b644f7.png"/></td>
-    </tr>
-	<tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-d4fe726319ece268d4746602c39cffc0621.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-c195234bbcd30be6927f037a6755e6ab69c.png"/></td>
-    </tr>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/b6115bc8c31de52951982e509930b20684a.jpg"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-5e4daac0bb59612c5038448acbcef235e3a.png"/></td>
-    </tr>
-</table>
+**文档处理链路：**
+```
+文件上传(PDF/Word/MD) → Apache Tika解析 → 文本切片 → Embedding向量化 → 向量存储
+```
 
+**切片策略（ChunkStrategy）：**
+- PARAGRAPH：按段落切分（默认，保持语义完整性）
+- FIXED_SIZE：固定大小切分
+- SENTENCE：按句子切分
 
-## 若依前后端分离交流群
+**参数：** 最大500字/片，50字重叠窗口
 
-QQ群： [![加入QQ群](https://img.shields.io/badge/已满-937441-blue.svg)](https://jq.qq.com/?_wv=1027&k=5bVB1og) [![加入QQ群](https://img.shields.io/badge/已满-887144332-blue.svg)](https://jq.qq.com/?_wv=1027&k=5eiA4DH) [![加入QQ群](https://img.shields.io/badge/已满-180251782-blue.svg)](https://jq.qq.com/?_wv=1027&k=5AxMKlC) [![加入QQ群](https://img.shields.io/badge/已满-104180207-blue.svg)](https://jq.qq.com/?_wv=1027&k=51G72yr) [![加入QQ群](https://img.shields.io/badge/已满-186866453-blue.svg)](https://jq.qq.com/?_wv=1027&k=VvjN2nvu) [![加入QQ群](https://img.shields.io/badge/已满-201396349-blue.svg)](https://jq.qq.com/?_wv=1027&k=5vYAqA05) [![加入QQ群](https://img.shields.io/badge/已满-101456076-blue.svg)](https://jq.qq.com/?_wv=1027&k=kOIINEb5) [![加入QQ群](https://img.shields.io/badge/已满-101539465-blue.svg)](https://jq.qq.com/?_wv=1027&k=UKtX5jhs) [![加入QQ群](https://img.shields.io/badge/已满-264312783-blue.svg)](https://jq.qq.com/?_wv=1027&k=EI9an8lJ) [![加入QQ群](https://img.shields.io/badge/已满-167385320-blue.svg)](https://jq.qq.com/?_wv=1027&k=SWCtLnMz) [![加入QQ群](https://img.shields.io/badge/已满-104748341-blue.svg)](https://jq.qq.com/?_wv=1027&k=96Dkdq0k) [![加入QQ群](https://img.shields.io/badge/已满-160110482-blue.svg)](https://jq.qq.com/?_wv=1027&k=0fsNiYZt) [![加入QQ群](https://img.shields.io/badge/已满-170801498-blue.svg)](https://jq.qq.com/?_wv=1027&k=7xw4xUG1) [![加入QQ群](https://img.shields.io/badge/已满-108482800-blue.svg)](https://jq.qq.com/?_wv=1027&k=eCx8eyoJ) [![加入QQ群](https://img.shields.io/badge/已满-101046199-blue.svg)](https://jq.qq.com/?_wv=1027&k=SpyH2875) [![加入QQ群](https://img.shields.io/badge/已满-136919097-blue.svg)](https://jq.qq.com/?_wv=1027&k=tKEt51dz) [![加入QQ群](https://img.shields.io/badge/已满-143961921-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=0vBbSb0ztbBgVtn3kJS-Q4HUNYwip89G&authKey=8irq5PhutrZmWIvsUsklBxhj57l%2F1nOZqjzigkXZVoZE451GG4JHPOqW7AW6cf0T&noverify=0&group_code=143961921) [![加入QQ群](https://img.shields.io/badge/已满-174951577-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=ZFAPAbp09S2ltvwrJzp7wGlbopsc0rwi&authKey=HB2cxpxP2yspk%2Bo3WKTBfktRCccVkU26cgi5B16u0KcAYrVu7sBaE7XSEqmMdFQp&noverify=0&group_code=174951577) [![加入QQ群](https://img.shields.io/badge/已满-161281055-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=Fn2aF5IHpwsy8j6VlalNJK6qbwFLFHat&authKey=uyIT%2B97x2AXj3odyXpsSpVaPMC%2Bidw0LxG5MAtEqlrcBcWJUA%2FeS43rsF1Tg7IRJ&noverify=0&group_code=161281055) [![加入QQ群](https://img.shields.io/badge/已满-138988063-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=XIzkm_mV2xTsUtFxo63bmicYoDBA6Ifm&authKey=dDW%2F4qsmw3x9govoZY9w%2FoWAoC4wbHqGal%2BbqLzoS6VBarU8EBptIgPKN%2FviyC8j&noverify=0&group_code=138988063) [![加入QQ群](https://img.shields.io/badge/已满-151450850-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=DkugnCg68PevlycJSKSwjhFqfIgrWWwR&authKey=pR1Pa5lPIeGF%2FFtIk6d%2FGB5qFi0EdvyErtpQXULzo03zbhopBHLWcuqdpwY241R%2F&noverify=0&group_code=151450850) [![加入QQ群](https://img.shields.io/badge/已满-224622315-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=F58bgRa-Dp-rsQJThiJqIYv8t4-lWfXh&authKey=UmUs4CVG5OPA1whvsa4uSespOvyd8%2FAr9olEGaWAfdLmfKQk%2FVBp2YU3u2xXXt76&noverify=0&group_code=224622315) [![加入QQ群](https://img.shields.io/badge/已满-287842588-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=Nxb2EQ5qozWa218Wbs7zgBnjLSNk_tVT&authKey=obBKXj6SBKgrFTJZx0AqQnIYbNOvBB2kmgwWvGhzxR67RoRr84%2Bus5OadzMcdJl5&noverify=0&group_code=287842588) [![加入QQ群](https://img.shields.io/badge/已满-187944233-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=numtK1M_I4eVd2Gvg8qtbuL8JgX42qNh&authKey=giV9XWMaFZTY%2FqPlmWbkB9g3fi0Ev5CwEtT9Tgei0oUlFFCQLDp4ozWRiVIzubIm&noverify=0&group_code=187944233) [![加入QQ群](https://img.shields.io/badge/已满-228578329-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=G6r5KGCaa3pqdbUSXNIgYloyb8e0_L0D&authKey=4w8tF1eGW7%2FedWn%2FHAypQksdrML%2BDHolQSx7094Agm7Luakj9EbfPnSTxSi2T1LQ&noverify=0&group_code=228578329) [![加入QQ群](https://img.shields.io/badge/已满-191164766-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=GsOo-OLz53J8y_9TPoO6XXSGNRTgbFxA&authKey=R7Uy%2Feq%2BZsoKNqHvRKhiXpypW7DAogoWapOawUGHokJSBIBIre2%2FoiAZeZBSLuBc&noverify=0&group_code=191164766) [![加入QQ群](https://img.shields.io/badge/已满-174569686-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=PmYavuzsOthVqfdAPbo4uAeIbu7Ttjgc&authKey=p52l8%2FXa4PS1JcEmS3VccKSwOPJUZ1ZfQ69MEKzbrooNUljRtlKjvsXf04bxNp3G&noverify=0&group_code=174569686) [![加入QQ群](https://img.shields.io/badge/127358632-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=M9y5NjAl44lAL_Vh2crmEehZU_PMU6KS&authKey=ZSDz8hEREWSaPuxQV3gEwqGIaGjfRNnkB4rJjf0IvXhrSUGSGwQFmBA%2Boe8HFxyl&noverify=0&group_code=127358632) 点击按钮入群。
+### 4.3 RAG 知识问答
+
+**RAG 流程：**
+```
+用户提问 → Query Embedding → 向量召回 TopK → Prompt构造(上下文+问题) → LLM生成 → 答案+引用
+```
+
+**关键设计：**
+- TopK = 3（可配置）
+- 相似度阈值过滤（score < 0.3 的结果不返回）
+- 温度控制 = 0.3（减少幻觉）
+- 答案附带引用来源，用户可验证
+
+### 4.4 Agent 智能助手
+
+**Agent 架构：**
+```
+Agent = LLM + Memory + Tools
+```
+
+**Function Calling 流程：**
+```
+用户输入 → 意图识别(LLM) → Tool选择 → 执行工具 → 结果返回LLM → 生成答案
+```
+
+**已实现工具：**
+
+| 工具 | 功能 | 数据来源 |
+|------|------|----------|
+| query_employee | 查询员工信息 | 若依用户服务 |
+| query_department | 查询部门信息 | 若依部门服务 |
+| search_knowledge | 知识库语义检索 | RAG向量检索 |
+
+**工具扩展机制：** `@AgentTool` 注解 + `AiTool` 接口，新增工具无需修改已有代码。
+
+### 4.5 会话管理
+
+- **Redis 短期缓存**：最近20轮对话，TTL 2小时
+- **MySQL 长期存储**：全量对话历史，永久保存
+- 读取优先级：Redis → MySQL（缓存未命中时自动回填）
+
+### 4.6 操作日志审计
+
+- **AI 调用日志**（ai_audit_log）：记录每次 AI 操作的用户、问题、工具、响应时间、状态
+- **工具调用日志**（ai_tool_log）：记录 Agent 工具的输入输出和执行耗时
+- **异步任务日志**（ai_async_task）：跟踪文档处理任务的状态流转
+
+## 五、数据库设计
+
+### 核心表（AI模块新增6张）
+
+| 表名 | 说明 |
+|------|------|
+| kb_document | 知识库文档（标题/路径/类型/状态） |
+| kb_chunk | 文档切片（内容/序号/Token数） |
+| ai_conversation | 对话历史（用户/会话/角色/内容） |
+| ai_tool_log | 工具调用日志 |
+| ai_audit_log | AI调用审计日志 |
+| ai_async_task | 异步任务状态 |
+
+### 若依基础表（继承）
+
+sys_user, sys_role, sys_menu, sys_dept, sys_oper_log 等
+
+## 六、模块结构
+
+```
+ruoyi-ai/src/main/java/com/ruoyi/ai/
+├── config/
+│   ├── AiConfig.java            # AI全局配置
+│   ├── RagConfig.java           # RAG参数配置
+│   └── ChunkStrategy.java       # 切片策略枚举
+├── controller/
+│   ├── AiController.java        # AI问答接口（chat/rag/agent）
+│   └── KbController.java        # 知识库管理接口
+├── service/                     # 接口层（面向接口编程）
+│   ├── LlmService.java
+│   ├── EmbeddingService.java
+│   ├── VectorStoreService.java
+│   ├── KbService.java
+│   ├── RagService.java
+│   ├── AgentService.java
+│   ├── ConversationCacheService.java
+│   └── impl/                    # 实现层
+│       ├── LlmServiceImpl.java
+│       ├── EmbeddingServiceImpl.java
+│       ├── VectorStoreServiceImpl.java
+│       ├── KbServiceImpl.java
+│       ├── RagServiceImpl.java
+│       ├── AgentServiceImpl.java
+│       ├── ConversationCacheServiceImpl.java
+│       └── AsyncTaskServiceImpl.java
+├── tool/                        # Agent工具层
+│   ├── AiTool.java              # 工具接口
+│   ├── AgentTool.java           # 工具注解
+│   ├── ToolRegistry.java        # 工具注册中心
+│   ├── EmployeeTool.java        # 员工查询工具
+│   ├── DepartmentTool.java      # 部门查询工具
+│   └── KnowledgeTool.java       # 知识检索工具
+├── entity/                      # 数据实体
+├── mapper/                      # MyBatis接口
+├── domain/
+│   ├── dto/                     # 请求DTO
+│   ├── vo/                      # 响应VO
+│   └── query/                   # 查询条件
+└── exception/                   # 异常体系
+    ├── AiException.java
+    ├── LlmCallException.java
+    ├── EmbeddingException.java
+    ├── ToolExecutionException.java
+    ├── DocumentProcessException.java
+    └── AiExceptionHandler.java  # 全局异常处理
+```
+
+## 七、快速启动
+
+### 环境要求
+
+- JDK 17+
+- Maven 3.8+
+- MySQL 8.0+
+- Redis 6.0+
+- Node.js 16+（前端）
+
+### 后端启动
+
+```bash
+# 1. 创建数据库
+mysql -u root -e "CREATE DATABASE ruoyi DEFAULT CHARSET utf8mb4;"
+
+# 2. 导入SQL
+mysql -u root ruoyi < sql/ry_20260320.sql
+mysql -u root ruoyi < sql/quartz.sql
+mysql -u root ruoyi < sql/ai_module.sql
+
+# 3. 修改配置（application-druid.yml 中数据库连接信息）
+
+# 4. 配置AI（application.yml 中 ai.* 配置）
+#    - 使用 DeepSeek: 设置 ai.api-key
+#    - 使用 Ollama: 设置 ai.provider=ollama
+
+# 5. 编译运行
+mvn clean install -DskipTests
+mvn spring-boot:run -pl ruoyi-admin
+```
+
+### 前端启动
+
+```bash
+cd ruoyi-ui
+npm install
+npm run dev
+```
+
+## 八、面试技术亮点
+
+1. **RAG 检索增强生成**：直接用 OkHttp 调用 Embedding/Chat API，不依赖框架，体现对底层协议的理解
+2. **Agent Function Calling**：实现 OpenAI 兼容的工具调用协议，支持多轮工具调用循环
+3. **工具扩展机制**：`@AgentTool` 注解 + `AiTool` 接口，符合开闭原则
+4. **面向接口编程**：所有 Service 拆分接口/实现，便于 Mock 测试和实现替换
+5. **Redis + MySQL 双层缓存**：会话历史读写优化，Redis 做短期缓存，MySQL 做持久化
+6. **异步任务处理**：文档上传后异步处理，前端轮询状态，用户体验好
+7. **完整异常体系**：自定义异常层级 + 全局异常处理器，统一错误响应格式
+8. **审计日志**：所有 AI 调用留痕，满足央国企合规要求
+
+## 九、基于若依二次开发说明
+
+### 继承的能力（不修改）
+
+- 用户/角色/菜单/部门管理
+- JWT 认证 + Spring Security
+- 操作日志（@Log 注解 AOP）
+- 文件上传、分页、全局异常
+
+### 新增的模块
+
+- `ruoyi-ai` 模块：~30 个 Java 文件，~3000 行核心代码
+- 6 张数据库表
+- 知识库管理 + RAG 问答 + Agent 助手
+- 完整的工程化设计（接口分层、异常体系、审计日志、异步任务）
+
+## 十、License
+
+基于 [RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue) 二次开发，遵循原项目 MIT License。

@@ -5,8 +5,8 @@ import com.ruoyi.system.service.ISysDeptService;
 import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.core.domain.entity.SysDept;
-import com.ruoyi.ai.service.impl.VectorStoreService;
-import com.ruoyi.ai.service.impl.EmbeddingService;
+import com.ruoyi.ai.service.VectorStoreService;
+import com.ruoyi.ai.service.EmbeddingService;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

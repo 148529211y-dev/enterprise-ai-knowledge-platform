@@ -67,6 +67,46 @@ CREATE TABLE ai_tool_log (
     INDEX idx_tool_name (tool_name)
 ) ENGINE=InnoDB COMMENT='Agent工具调用日志表';
 
+-- AI审计日志表（满足央国企审计要求）
+DROP TABLE IF EXISTS ai_audit_log;
+CREATE TABLE ai_audit_log (
+    id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    user_id         BIGINT       DEFAULT NULL COMMENT '用户ID',
+    session_id      VARCHAR(64)  DEFAULT NULL COMMENT '会话ID',
+    operation_type  VARCHAR(20)  NOT NULL COMMENT '操作类型: chat/rag/agent/embed/tool',
+    question        TEXT         DEFAULT NULL COMMENT '用户问题',
+    tool_name       VARCHAR(100) DEFAULT NULL COMMENT '工具名称',
+    tool_args       TEXT         DEFAULT NULL COMMENT '工具输入参数',
+    answer          TEXT         DEFAULT NULL COMMENT 'AI回答(截取前500字)',
+    token_count     INT          DEFAULT NULL COMMENT '消耗Token数',
+    response_time   BIGINT       DEFAULT 0 COMMENT '响应时间(ms)',
+    status          TINYINT      DEFAULT 1 COMMENT '状态: 1-成功 0-失败',
+    error_message   VARCHAR(500) DEFAULT NULL COMMENT '错误信息',
+    create_time     DATETIME     DEFAULT NULL COMMENT '创建时间',
+    PRIMARY KEY (id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_operation (operation_type),
+    INDEX idx_create_time (create_time)
+) ENGINE=InnoDB COMMENT='AI调用审计日志表';
+
+-- 异步任务表（跟踪文档处理等耗时任务）
+DROP TABLE IF EXISTS ai_async_task;
+CREATE TABLE ai_async_task (
+    id            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '任务ID',
+    task_id       VARCHAR(64)  NOT NULL COMMENT '任务唯一标识(UUID)',
+    task_type     VARCHAR(50)  NOT NULL COMMENT '任务类型: doc_process/doc_reindex',
+    biz_id        BIGINT       DEFAULT NULL COMMENT '关联业务ID(如文档ID)',
+    status        VARCHAR(20)  NOT NULL DEFAULT 'WAITING' COMMENT '状态: WAITING/RUNNING/SUCCESS/FAILED',
+    progress      VARCHAR(200) DEFAULT NULL COMMENT '进度描述',
+    error_message VARCHAR(500) DEFAULT NULL COMMENT '错误信息',
+    create_by     BIGINT       DEFAULT NULL COMMENT '创建者ID',
+    create_time   DATETIME     DEFAULT NULL COMMENT '创建时间',
+    update_time   DATETIME     DEFAULT NULL COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE INDEX uk_task_id (task_id),
+    INDEX idx_status (status)
+) ENGINE=InnoDB COMMENT='异步任务表';
+
 -- 插入知识库菜单
 INSERT INTO sys_menu VALUES (2000, '知识管理', 0, 3, 'knowledge', NULL, NULL, '1', '0', '', 'documentation', 'admin', sysdate(), '', NULL, '知识管理目录');
 INSERT INTO sys_menu VALUES (2001, '文档管理', 2000, 1, 'document', 'ai/kb/document', NULL, '1', '0', 'ai:document:list', 'form', 'admin', sysdate(), '', NULL, '文档管理菜单');

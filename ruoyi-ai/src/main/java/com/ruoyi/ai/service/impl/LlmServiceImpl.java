@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.ai.config.AiConfig;
+import com.ruoyi.ai.service.LlmService;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,20 +19,20 @@ import java.util.concurrent.TimeUnit;
  * LLM 调用服务 —— 直接通过 OkHttp 调用 OpenAI 兼容 API
  *
  * 设计说明（面试要点）：
- * 1. 为什么不用 Spring AI？ —— 直接调用更能体现对底层协议的理解，且无版本兼容问题
- * 2. 为什么用 OkHttp？ —— 支持连接池复用、超时控制、性能优于 RestTemplate
- * 3. 为什么同时支持 DeepSeek 和 Ollama？ —— 生产环境用云端API，演示时用本地模型
+ * 1. 为什么不用 Spring AI？—— 直接调用更能体现对底层协议的理解，且无版本兼容问题
+ * 2. 为什么用 OkHttp？—— 支持连接池复用、超时控制、性能优于 RestTemplate
+ * 3. 为什么同时支持 DeepSeek 和 Ollama？—— 生产环境用云端API，演示时用本地模型
  *
  * API 格式: OpenAI Chat Completions (POST /v1/chat/completions)
  */
 @Service
-public class LlmService {
+public class LlmServiceImpl implements LlmService {
 
-    private static final Logger log = LoggerFactory.getLogger(LlmService.class);
+    private static final Logger log = LoggerFactory.getLogger(LlmServiceImpl.class);
     private final AiConfig config;
     private final OkHttpClient httpClient;
 
-    public LlmService(AiConfig config) {
+    public LlmServiceImpl(AiConfig config) {
         this.config = config;
         this.httpClient = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
@@ -44,6 +45,7 @@ public class LlmService {
     /**
      * 单轮对话（无历史）
      */
+    @Override
     public String chat(String systemPrompt, String userMessage) {
         JSONArray messages = new JSONArray();
         if (systemPrompt != null && !systemPrompt.isEmpty()) {
@@ -56,6 +58,7 @@ public class LlmService {
     /**
      * 多轮对话（带历史上下文，用于 Agent / RAG）
      */
+    @Override
     public String chatWithHistory(List<Map<String, String>> messages) {
         JSONArray arr = new JSONArray();
         for (Map<String, String> msg : messages) {
@@ -71,6 +74,7 @@ public class LlmService {
      * @param tools      工具定义列表（OpenAI function calling 格式）
      * @return 完整的 LLM 响应 JSON（可能包含 tool_calls）
      */
+    @Override
     public JSONObject chatWithTools(List<Map<String, String>> messages, JSONArray tools) {
         JSONObject body = buildRequestBody(messages);
         body.put("tools", tools);
