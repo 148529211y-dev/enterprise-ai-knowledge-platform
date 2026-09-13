@@ -5,7 +5,10 @@ import com.ruoyi.ai.entity.KbDocument;
 import com.ruoyi.ai.mapper.KbChunkMapper;
 import com.ruoyi.ai.mapper.KbDocumentMapper;
 import com.ruoyi.ai.domain.query.KbDocumentQuery;
+import com.ruoyi.ai.service.AsyncTaskService;
+import com.ruoyi.ai.service.EmbeddingService;
 import com.ruoyi.ai.service.KbService;
+import com.ruoyi.ai.service.VectorStoreService;
 import com.ruoyi.common.core.domain.AjaxResult;
 import org.apache.tika.Tika;
 import org.slf4j.Logger;
@@ -20,54 +23,37 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-/**
- * 知识库文档管理服务
- *
- * 职责：文档上传 → 文本解析 → 文本切片 → 调用 Embedding → 存入向量索引
- *
- * 面试知识 —— Chunk 切片策略：
- *   1. 按段落切分：以 \n\n 为界，保持语义完整性（本项目采用）
- *   2. 固定 Token 数切分：每 N 个 token 切一刀，简单但可能截断语义
- *   3. 滑动窗口：相邻切片有重叠，保证上下文连贯
- *   本项目采用「按段落 + 最大长度限制 + 重叠」的混合策略
- */
 @Service
 public class KbServiceImpl implements KbService {
 
     private static final Logger log = LoggerFactory.getLogger(KbServiceImpl.class);
 
-    /** 单个切片最大字符数 */
     private static final int MAX_CHUNK_SIZE = 500;
-    /** 相邻切片重叠字符数 */
     private static final int OVERLAP_SIZE = 50;
 
     private final KbDocumentMapper docMapper;
     private final KbChunkMapper chunkMapper;
-    private final EmbeddingServiceImpl embeddingService;
-    private final VectorStoreServiceImpl vectorStore;
+    private final EmbeddingService embeddingService;
+    private final VectorStoreService vectorStore;
+    private final AsyncTaskService asyncTaskService;
     private final Tika tika = new Tika();
 
-    /** 文件上传根目录 */
     private final String uploadDir;
 
     public KbServiceImpl(KbDocumentMapper docMapper, KbChunkMapper chunkMapper,
-                         EmbeddingServiceImpl embeddingService, VectorStoreServiceImpl vectorStore) {
+                         EmbeddingService embeddingService, VectorStoreService vectorStore,
+                         AsyncTaskService asyncTaskService) {
         this.docMapper = docMapper;
         this.chunkMapper = chunkMapper;
         this.embeddingService = embeddingService;
         this.vectorStore = vectorStore;
+        this.asyncTaskService = asyncTaskService;
         this.uploadDir = System.getProperty("user.home") + "/ruoyi-upload/kb/";
     }
 
-    /**
-     * 文档列表查询
-     */
     @Override
     public List<KbDocument> listDocuments(KbDocumentQuery query) {
-        // Query → Entity 转换（Mapper 层保持接收 Entity）
         KbDocument entity = new KbDocument();
         if (query != null) {
             entity.setTitle(query.getTitle());
@@ -82,15 +68,8 @@ public class KbServiceImpl implements KbService {
         return docMapper.selectById(id);
     }
 
-    /**
-     * 上传并处理文档 —— 完整链路
-     *
-     * 流程：上传 → 解析 → 切片 → Embedding → 存储
-     */
     @Override
-    @Transactional
     public AjaxResult uploadAndProcess(MultipartFile file, String title, String createBy) throws Exception {
-        // 1. 文件存储
         String originalName = file.getOriginalFilename();
         String fileType = getFileExtension(originalName);
         String savedName = UUID.randomUUID() + "." + fileType;
@@ -101,43 +80,71 @@ public class KbServiceImpl implements KbService {
         Path filePath = dirPath.resolve(savedName);
         file.transferTo(filePath.toFile());
 
-        // 2. 保存文档记录
         KbDocument doc = new KbDocument();
         doc.setTitle(title != null && !title.isEmpty() ? title : originalName);
         doc.setFilePath(filePath.toString());
         doc.setFileType(fileType);
         doc.setFileSize(file.getSize());
         doc.setCreateBy(createBy);
-        doc.setStatus(0); // 待处理
-        docMapper.insert(doc);
+        doc.setStatus(0);
+        saveDocumentRecord(doc);
 
-        // 3. 处理文档（解析 → 切片 → 向量化）
-        try {
-            processDocument(doc);
-        } catch (Exception e) {
-            log.error("文档处理失败: docId={}", doc.getId(), e);
-            doc.setStatus(3); // 失败
-            docMapper.update(doc);
-            throw e;
-        }
+        String taskId = asyncTaskService.submitDocProcessTask(doc.getId(), null,
+                docId -> processDocumentAsync(docId));
 
-        return AjaxResult.success("文档上传成功", doc);
+        Map<String, Object> result = new HashMap<>();
+        result.put("docId", doc.getId());
+        result.put("taskId", taskId);
+        return AjaxResult.success("文档上传成功", result);
     }
 
-    /**
-     * 文档处理核心流程
-     */
+    @Override
+    public void processDocument(KbDocument doc) throws Exception {
+        processDocumentAsync(doc.getId());
+    }
+
     @Override
     @Transactional
-    public void processDocument(KbDocument doc) throws Exception {
-        // 1. 文本解析（Apache Tika）
+    public void deleteDocument(Long docId) {
+        vectorStore.removeByDocId(docId);
+        chunkMapper.deleteByDocId(docId);
+        docMapper.deleteById(docId);
+    }
+
+    @Override
+    public String reindexAll(Long userId) {
+        KbDocument query = new KbDocument();
+        query.setStatus(2);
+        List<KbDocument> docs = docMapper.selectList(query);
+        List<Long> docIds = new ArrayList<>();
+        for (KbDocument doc : docs) {
+            docIds.add(doc.getId());
+        }
+        return asyncTaskService.submitDocProcessTask(0L, userId, docId -> {
+            for (Long id : docIds) {
+                try {
+                    updateDocStatus(id, 0);
+                    processDocumentAsync(id);
+                } catch (Exception e) {
+                    log.error("reindex failed for docId={}", id, e);
+                    updateDocStatus(id, 3);
+                }
+            }
+        });
+    }
+
+    public void processDocumentAsync(Long docId) throws Exception {
+        KbDocument doc = docMapper.selectById(docId);
+        if (doc == null) {
+            throw new FileNotFoundException("文档不存在: " + docId);
+        }
+
         String content = parseDocument(doc.getFilePath(), doc.getFileType());
         doc.setContent(content);
-        doc.setStatus(1); // 已解析
+        doc.setStatus(1);
         docMapper.update(doc);
         log.info("文档解析完成: docId={}, 文本长度={}", doc.getId(), content.length());
 
-        // 2. 文本切片
         List<String> textChunks = chunkText(content);
         List<KbChunk> chunks = new ArrayList<>();
         for (int i = 0; i < textChunks.size(); i++) {
@@ -148,21 +155,17 @@ public class KbServiceImpl implements KbService {
             chunk.setTokenCount(estimateTokens(textChunks.get(i)));
             chunks.add(chunk);
         }
-        if (!chunks.isEmpty()) {
-            chunkMapper.insertBatch(chunks);
-        }
+        saveChunks(doc.getId(), chunks);
         doc.setChunkCount(chunks.size());
         docMapper.update(doc);
         log.info("文本切片完成: docId={}, 切片数={}", doc.getId(), chunks.size());
 
-        // 3. 向量化（Embedding）
         List<KbChunk> savedChunks = chunkMapper.selectByDocId(doc.getId());
         List<String> texts = new ArrayList<>();
         for (KbChunk c : savedChunks) {
             texts.add(c.getContent());
         }
 
-        // 分批调用 Embedding API（每批最多 16 条）
         List<float[]> allVectors = new ArrayList<>();
         int batchSize = 16;
         for (int i = 0; i < texts.size(); i += batchSize) {
@@ -170,35 +173,35 @@ public class KbServiceImpl implements KbService {
             List<float[]> batch = embeddingService.embedBatch(texts.subList(i, end));
             allVectors.addAll(batch);
             if (i + batchSize < texts.size()) {
-                Thread.sleep(200); // 避免 API 限流
+                Thread.sleep(200);
             }
         }
 
-        // 4. 存入向量索引
         vectorStore.store(savedChunks, allVectors);
-        doc.setStatus(2); // 已向量化
-        docMapper.update(doc);
+        updateDocStatus(doc.getId(), 2);
         log.info("文档向量化完成: docId={}, 向量数={}", doc.getId(), allVectors.size());
     }
 
-    /**
-     * 删除文档及其切片和向量
-     */
-    @Override
     @Transactional
-    public void deleteDocument(Long docId) {
-        vectorStore.removeByDocId(docId);
-        chunkMapper.deleteByDocId(docId);
-        docMapper.deleteById(docId);
+    public void saveDocumentRecord(KbDocument doc) {
+        docMapper.insert(doc);
     }
 
-    // ==================== 内部方法 ====================
+    @Transactional
+    public void saveChunks(Long docId, List<KbChunk> chunks) {
+        if (!chunks.isEmpty()) {
+            chunkMapper.insertBatch(chunks);
+        }
+    }
 
-    /**
-     * 文本解析 —— 使用 Apache Tika
-     *
-     * Tika 支持 PDF/Word/HTML/Markdown 等多种格式，自动识别文件类型
-     */
+    @Transactional
+    public void updateDocStatus(Long docId, int status) {
+        KbDocument doc = new KbDocument();
+        doc.setId(docId);
+        doc.setStatus(status);
+        docMapper.update(doc);
+    }
+
     private String parseDocument(String filePath, String fileType) throws Exception {
         File file = new File(filePath);
         if (!file.exists()) {
@@ -207,27 +210,15 @@ public class KbServiceImpl implements KbService {
 
         String rawText;
         if ("md".equals(fileType) || "txt".equals(fileType)) {
-            // Markdown/纯文本直接读取
             rawText = Files.readString(file.toPath(), StandardCharsets.UTF_8);
         } else {
-            // PDF/Word 等使用 Tika 解析
             rawText = tika.parseToString(file);
         }
-        // 清洗：去除多余空白行
         return rawText.replaceAll("\\n{3,}", "\n\n").trim();
     }
 
-    /**
-     * 文本切片 —— 按段落 + 最大长度 + 重叠
-     *
-     * 策略说明（面试要点）：
-     * 1. 优先按段落（\n\n）切分，保持语义完整性
-     * 2. 超长段落按 MAX_CHUNK_SIZE 再切，避免单片过大
-     * 3. 相邻切片保留 OVERLAP_SIZE 字符重叠，保证上下文连贯
-     */
     private List<String> chunkText(String text) {
         List<String> chunks = new ArrayList<>();
-        // 先按段落拆分
         String[] paragraphs = text.split("\\n\\n+");
 
         StringBuilder current = new StringBuilder();
@@ -242,13 +233,11 @@ public class KbServiceImpl implements KbService {
                 if (current.length() > 0) {
                     chunks.add(current.toString());
                 }
-                // 超长段落需要再切
                 if (para.length() > MAX_CHUNK_SIZE) {
                     List<String> subChunks = splitLongText(para);
                     chunks.addAll(subChunks);
                     current = new StringBuilder();
                 } else {
-                    // 保留重叠部分
                     String prev = current.toString();
                     if (prev.length() > OVERLAP_SIZE) {
                         current = new StringBuilder(prev.substring(prev.length() - OVERLAP_SIZE));
@@ -265,14 +254,12 @@ public class KbServiceImpl implements KbService {
         return chunks;
     }
 
-    /** 超长文本按句号换行再切 */
     private List<String> splitLongText(String text) {
         List<String> result = new ArrayList<>();
         int start = 0;
         while (start < text.length()) {
             int end = Math.min(start + MAX_CHUNK_SIZE, text.length());
             if (end < text.length()) {
-                // 尝试在句号处断开
                 int lastPeriod = text.lastIndexOf('。', end);
                 if (lastPeriod > start) end = lastPeriod + 1;
             }
@@ -290,7 +277,6 @@ public class KbServiceImpl implements KbService {
         return dot > 0 ? filename.substring(dot + 1).toLowerCase() : "txt";
     }
 
-    /** 粗略估算 token 数（中文约 1.5 字/token，英文约 4 字符/token） */
     private int estimateTokens(String text) {
         int chinese = 0, other = 0;
         for (char c : text.toCharArray()) {

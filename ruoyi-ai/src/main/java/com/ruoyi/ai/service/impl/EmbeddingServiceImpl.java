@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.ai.config.AiConfig;
+import com.ruoyi.ai.exception.EmbeddingException;
 import com.ruoyi.ai.service.EmbeddingService;
 import okhttp3.*;
 import org.slf4j.Logger;
@@ -16,14 +17,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Embedding 向量化服务
- *
- * 面试知识点：
- * 1. 什么是 Embedding？—— 将文本映射为高维向量，语义相近的文本向量距离更近
- * 2. 为什么需要向量化？—— 传统关键词匹配无法理解语义（"请假" vs "休假申请"）
- * 3. 为什么不用 MySQL 做向量检索？—— MySQL 不支持高效的高维向量相似度计算
- */
 @Service
 public class EmbeddingServiceImpl implements EmbeddingService {
 
@@ -39,22 +32,12 @@ public class EmbeddingServiceImpl implements EmbeddingService {
                 .build();
     }
 
-    /**
-     * 将单条文本转为向量
-     */
     @Override
     public float[] embed(String text) {
         List<float[]> results = embedBatch(Collections.singletonList(text));
         return results.isEmpty() ? new float[0] : results.get(0);
     }
 
-    /**
-     * 批量文本向量化（减少 API 调用次数）
-     *
-     * API: POST /v1/embeddings
-     * Request:  { "model": "...", "input": ["text1", "text2"] }
-     * Response: { "data": [{ "embedding": [0.1, ...] }] }
-     */
     @Override
     public List<float[]> embedBatch(List<String> texts) {
         String url = resolveBaseUrl() + "/v1/embeddings";
@@ -73,9 +56,9 @@ public class EmbeddingServiceImpl implements EmbeddingService {
 
         try (Response response = httpClient.newCall(reqBuilder.build()).execute()) {
             if (!response.isSuccessful()) {
-                log.error("Embedding API 失败: code={}, body={}", response.code(),
-                        response.body() != null ? response.body().string() : "null");
-                return Collections.emptyList();
+                String respBody = response.body() != null ? response.body().string() : "null";
+                log.error("Embedding API 失败: code={}, body={}", response.code(), respBody);
+                throw new EmbeddingException("Embedding API调用失败: code=" + response.code());
             }
 
             String respStr = response.body().string();
@@ -94,17 +77,10 @@ public class EmbeddingServiceImpl implements EmbeddingService {
             return vectors;
         } catch (IOException e) {
             log.error("Embedding API 网络异常", e);
-            return Collections.emptyList();
+            throw new EmbeddingException("Embedding API网络异常", e);
         }
     }
 
-    /**
-     * 余弦相似度计算 —— 向量检索的核心算法
-     *
-     * 面试知识点：
-     * cosine(A, B) = (A·B) / (|A| × |B|)
-     * 值域 [-1, 1]，越接近 1 表示语义越相似
-     */
     public static double cosineSimilarity(float[] a, float[] b) {
         if (a == null || b == null || a.length != b.length) return 0.0;
         double dotProduct = 0, normA = 0, normB = 0;

@@ -7,9 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * 知识库检索工具 —— 复用 RAG 的向量检索能力
- */
 @AgentTool(name = "search_knowledge", description = "从企业知识库中搜索相关文档，当用户询问公司制度、流程、规范等问题时使用")
 @Component
 public class KnowledgeTool implements AiTool {
@@ -43,5 +40,22 @@ public class KnowledgeTool implements AiTool {
         } catch (Exception e) {
             return "知识库搜索失败: " + e.getMessage();
         }
+    }
+
+    @Override
+    public JSONObject getParametersSchema() {
+        JSONObject schema = new JSONObject();
+        schema.put("type", "object");
+
+        JSONObject queryProp = new JSONObject();
+        queryProp.put("type", "string");
+        queryProp.put("description", "搜索关键词或问题");
+
+        JSONObject properties = new JSONObject();
+        properties.put("query", queryProp);
+
+        schema.put("properties", properties);
+        schema.put("required", List.of("query"));
+        return schema;
     }
 }

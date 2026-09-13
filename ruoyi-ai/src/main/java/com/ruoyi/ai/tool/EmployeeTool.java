@@ -7,9 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * 查询员工信息工具
- */
 @AgentTool(name = "query_employee", description = "根据姓名查询员工信息，包括所属部门、职位、邮箱等")
 @Component
 public class EmployeeTool implements AiTool {
@@ -34,15 +31,45 @@ public class EmployeeTool implements AiTool {
             StringBuilder sb = new StringBuilder();
             sb.append("找到 ").append(users.size()).append(" 条员工信息：\n");
             for (SysUser u : users) {
+                String phone = u.getPhonenumber();
+                String maskedPhone = (phone != null && phone.length() > 7)
+                        ? phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4)
+                        : "****";
+                String email = u.getEmail();
+                String maskedEmail;
+                if (email != null && email.contains("@")) {
+                    int atIdx = email.indexOf('@');
+                    String prefix = atIdx > 3 ? email.substring(0, 3) : email.substring(0, atIdx);
+                    maskedEmail = prefix + "***@" + email.substring(atIdx + 1);
+                } else {
+                    maskedEmail = "***";
+                }
                 sb.append("- 姓名: ").append(u.getNickName())
                   .append(", 账号: ").append(u.getUserName())
-                  .append(", 邮箱: ").append(u.getEmail())
-                  .append(", 手机: ").append(u.getPhonenumber())
+                  .append(", 邮箱: ").append(maskedEmail)
+                  .append(", 手机: ").append(maskedPhone)
                   .append("\n");
             }
             return sb.toString();
         } catch (Exception e) {
             return "查询员工信息失败: " + e.getMessage();
         }
+    }
+
+    @Override
+    public JSONObject getParametersSchema() {
+        JSONObject schema = new JSONObject();
+        schema.put("type", "object");
+
+        JSONObject nameProp = new JSONObject();
+        nameProp.put("type", "string");
+        nameProp.put("description", "员工姓名");
+
+        JSONObject properties = new JSONObject();
+        properties.put("name", nameProp);
+
+        schema.put("properties", properties);
+        schema.put("required", List.of("name"));
+        return schema;
     }
 }

@@ -13,63 +13,35 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-/**
- * 向量存储服务 —— 内存向量检索 + MySQL 持久化
- *
- * 设计说明（面试要点）：
- *
- * Q: 为什么用向量数据库而不用 MySQL 直接查？
- * A: MySQL 擅长结构化查询（WHERE name = '张三'），但无法高效做"语义相似度搜索"。
- *    向量数据库（如 Qdrant/Milvus）专门优化了高维向量的近似最近邻(ANN)检索。
- *    本项目为演示目的使用内存向量 + 余弦相似度，生产环境应切换为 Qdrant。
- *
- * Q: 为什么选 Qdrant？
- * A: 1. Rust 实现，性能好  2. Spring AI 原生支持
- *    3. 单容器部署简单     4. 社区活跃
- *
- * 架构：
- *   MySQL → 持久化文档元数据和切片文本（保证数据不丢失）
- *   内存  → 缓存向量用于快速检索（启动时从 MySQL 加载）
- */
 @Service
 public class VectorStoreServiceImpl implements VectorStoreService {
 
     private static final Logger log = LoggerFactory.getLogger(VectorStoreServiceImpl.class);
 
-    /**
-     * 内存向量索引：chunkId → 向量
-     * 生产环境替换为 Qdrant/Milvus
-     */
     private final ConcurrentHashMap<Long, float[]> vectorIndex = new ConcurrentHashMap<>();
 
-    /**
-     * 切片内容缓存：chunkId → 切片信息
-     */
     private final ConcurrentHashMap<Long, ChunkEntry> chunkCache = new ConcurrentHashMap<>();
 
     private final KbChunkMapper chunkMapper;
-    private final EmbeddingServiceImpl embeddingService;
+    private final EmbeddingService embeddingService;
 
-    public VectorStoreServiceImpl(KbChunkMapper chunkMapper, EmbeddingServiceImpl embeddingService) {
+    public VectorStoreServiceImpl(KbChunkMapper chunkMapper, EmbeddingService embeddingService) {
         this.chunkMapper = chunkMapper;
         this.embeddingService = embeddingService;
     }
 
-    /**
-     * 启动时从数据库加载已有切片（简化版：实际应增量加载）
-     */
     @PostConstruct
     public void init() {
         log.info("向量存储服务初始化中...");
-        // 启动时暂不加载，按需向量化
+        List<KbChunk> allChunks = chunkMapper.selectAll();
+        for (KbChunk chunk : allChunks) {
+            chunkCache.put(chunk.getId(), new ChunkEntry(
+                    chunk.getId(), chunk.getDocId(), chunk.getChunkIndex(), chunk.getContent()
+            ));
+        }
+        log.info("启动加载完成，已缓存 {} 个切片", allChunks.size());
     }
 
-    /**
-     * 存储文档切片的向量
-     *
-     * @param chunks  从数据库读取的切片列表
-     * @param vectors 对应的向量列表
-     */
     @Override
     public void store(List<KbChunk> chunks, List<float[]> vectors) {
         for (int i = 0; i < chunks.size(); i++) {
@@ -82,22 +54,12 @@ public class VectorStoreServiceImpl implements VectorStoreService {
         log.info("已存储 {} 个切片向量", chunks.size());
     }
 
-    /**
-     * 向量相似度检索 —— 返回最相似的 TopK 个切片
-     *
-     * 面试知识点：TopK 选择
-     *   K=3~5 适合大多数场景：
-     *   - K 太小：可能遗漏关键信息
-     *   - K 太大：引入噪声，消耗 token
-     *   本项目默认 K=3
-     */
     @Override
     public List<SearchResult> search(float[] queryVector, int topK) {
         if (vectorIndex.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 计算所有向量与查询向量的余弦相似度
         List<SearchResult> results = new ArrayList<>();
         for (Map.Entry<Long, float[]> entry : vectorIndex.entrySet()) {
             double score = EmbeddingService.cosineSimilarity(queryVector, entry.getValue());
@@ -107,14 +69,10 @@ public class VectorStoreServiceImpl implements VectorStoreService {
             }
         }
 
-        // 按相似度降序排序，取 TopK
         results.sort((a, b) -> Double.compare(b.score, a.score));
         return results.stream().limit(topK).collect(Collectors.toList());
     }
 
-    /**
-     * 删除某文档的所有向量
-     */
     @Override
     public void removeByDocId(Long docId) {
         List<Long> toRemove = new ArrayList<>();
@@ -135,7 +93,19 @@ public class VectorStoreServiceImpl implements VectorStoreService {
         return vectorIndex.size();
     }
 
-    // ==================== 数据结构 ====================
+    @Override
+    public void rebuildIndex(List<KbChunk> chunks, List<float[]> vectors) {
+        vectorIndex.clear();
+        chunkCache.clear();
+        for (int i = 0; i < chunks.size(); i++) {
+            KbChunk chunk = chunks.get(i);
+            vectorIndex.put(chunk.getId(), vectors.get(i));
+            chunkCache.put(chunk.getId(), new ChunkEntry(
+                    chunk.getId(), chunk.getDocId(), chunk.getChunkIndex(), chunk.getContent()
+            ));
+        }
+        log.info("索引重建完成，共 {} 个切片", chunks.size());
+    }
 
     private static class ChunkEntry {
         Long id;

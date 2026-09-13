@@ -1,36 +1,35 @@
 package com.ruoyi.ai.controller;
 
-import com.ruoyi.ai.domain.dto.ChatRequest;
-import com.ruoyi.ai.domain.dto.ChatResponse;
 import com.ruoyi.ai.domain.query.KbDocumentQuery;
 import com.ruoyi.ai.domain.vo.KbDocumentVO;
+import com.ruoyi.ai.entity.AsyncTask;
 import com.ruoyi.ai.entity.KbDocument;
+import com.ruoyi.ai.service.AsyncTaskService;
 import com.ruoyi.ai.service.KbService;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.utils.SecurityUtils;
-import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * 知识库文档管理接口
- */
 @RestController
 @RequestMapping("/ai/kb")
 public class KbController extends BaseController {
 
     private final KbService kbService;
+    private final AsyncTaskService asyncTaskService;
 
-    public KbController(KbService kbService) {
+    public KbController(KbService kbService, AsyncTaskService asyncTaskService) {
         this.kbService = kbService;
+        this.asyncTaskService = asyncTaskService;
     }
 
-    /** 文档列表 —— 使用 Query 对象接收查询条件，返回 VO */
+    @PreAuthorize("@ss.hasPermi('ai:kb:list')")
     @GetMapping("/list")
     public TableDataInfo list(KbDocumentQuery query) {
         startPage();
@@ -41,14 +40,14 @@ public class KbController extends BaseController {
         return getDataTable(voList);
     }
 
-    /** 文档详情 */
+    @PreAuthorize("@ss.hasPermi('ai:kb:list')")
     @GetMapping("/{id}")
     public AjaxResult detail(@PathVariable Long id) {
         KbDocument doc = kbService.getById(id);
         return AjaxResult.success(doc != null ? KbDocumentVO.fromEntity(doc) : null);
     }
 
-    /** 上传文档（异步处理） */
+    @PreAuthorize("@ss.hasPermi('ai:kb:upload')")
     @PostMapping("/upload")
     public AjaxResult upload(@RequestParam("file") MultipartFile file,
                              @RequestParam(value = "title", required = false) String title) {
@@ -61,10 +60,25 @@ public class KbController extends BaseController {
         }
     }
 
-    /** 删除文档 */
+    @PreAuthorize("@ss.hasPermi('ai:kb:delete')")
     @DeleteMapping("/{id}")
     public AjaxResult delete(@PathVariable Long id) {
         kbService.deleteDocument(id);
         return AjaxResult.success();
+    }
+
+    @PreAuthorize("@ss.hasPermi('ai:kb:list')")
+    @GetMapping("/task/{taskId}")
+    public AjaxResult taskStatus(@PathVariable String taskId) {
+        AsyncTask task = asyncTaskService.getTaskStatus(taskId);
+        return AjaxResult.success(task);
+    }
+
+    @PreAuthorize("@ss.hasPermi('ai:kb:upload')")
+    @PostMapping("/reindex")
+    public AjaxResult reindex() {
+        Long userId = SecurityUtils.getUserId();
+        String taskId = kbService.reindexAll(userId);
+        return AjaxResult.success("reindex submitted", taskId);
     }
 }

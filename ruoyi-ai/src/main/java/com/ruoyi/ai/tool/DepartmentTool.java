@@ -7,9 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * 查询部门信息工具
- */
 @AgentTool(name = "query_department", description = "查询企业部门信息，包括部门名称、部门领导、上级部门等")
 @Component
 public class DepartmentTool implements AiTool {
@@ -43,5 +40,22 @@ public class DepartmentTool implements AiTool {
         } catch (Exception e) {
             return "查询部门信息失败: " + e.getMessage();
         }
+    }
+
+    @Override
+    public JSONObject getParametersSchema() {
+        JSONObject schema = new JSONObject();
+        schema.put("type", "object");
+
+        JSONObject deptNameProp = new JSONObject();
+        deptNameProp.put("type", "string");
+        deptNameProp.put("description", "部门名称");
+
+        JSONObject properties = new JSONObject();
+        properties.put("dept_name", deptNameProp);
+
+        schema.put("properties", properties);
+        schema.put("required", List.of("dept_name"));
+        return schema;
     }
 }

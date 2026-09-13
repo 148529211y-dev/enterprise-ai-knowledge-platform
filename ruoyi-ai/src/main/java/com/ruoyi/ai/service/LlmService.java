@@ -1,22 +1,18 @@
 package com.ruoyi.ai.service;
 
-import com.ruoyi.ai.domain.vo.ChatMessageVO;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
+import com.ruoyi.ai.domain.dto.ChatMessage;
 
 import java.util.List;
-import java.util.Map;
 
-/**
- * LLM 调用服务接口
- */
 public interface LlmService {
 
-    /** 单轮对话 */
     String chat(String systemPrompt, String userMessage);
 
-    /** 多轮对话（带历史） */
-    String chatWithHistory(List<Map<String, String>> messages);
+    String chat(String systemPrompt, String userMessage, Double temperature);
 
-    /** 带工具定义的对话 — Function Calling */
-    com.alibaba.fastjson2.JSONObject chatWithTools(List<Map<String, String>> messages,
-                                                    com.alibaba.fastjson2.JSONArray tools);
+    String chatWithHistory(List<ChatMessage> messages);
+
+    JSONObject chatWithTools(List<ChatMessage> messages, JSONArray tools);
 }

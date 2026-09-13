@@ -13,18 +13,9 @@ import com.ruoyi.common.utils.SecurityUtils;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * AI 智能问答接口
- *
- * 支持三种模式：
- *   1. chat  —— 普通对话（直接调 LLM）
- *   2. rag   —— 知识库问答（检索 + 生成）
- *   3. agent —— 智能助手（LLM + 工具调用）
- *
- * 每次调用都会记录审计日志（AiAuditLog），满足央国企审计要求。
- */
 @RestController
 @RequestMapping("/ai/chat")
 public class AiController extends BaseController {
@@ -44,9 +35,7 @@ public class AiController extends BaseController {
         this.auditLogMapper = auditLogMapper;
     }
 
-    /**
-     * 统一聊天入口 —— @Valid 触发参数校验
-     */
+    @PreAuthorize("@ss.hasPermi('ai:chat:use')")
     @PostMapping
     public AjaxResult chat(@Valid @RequestBody ChatRequest request) {
         Long userId = SecurityUtils.getUserId();
@@ -80,7 +69,6 @@ public class AiController extends BaseController {
                     break;
             }
 
-            // 记录成功日志
             long duration = System.currentTimeMillis() - startTime;
             auditLog.setAnswer(response.getReply() != null && response.getReply().length() > 500
                     ? response.getReply().substring(0, 500) : response.getReply());
@@ -90,7 +78,6 @@ public class AiController extends BaseController {
 
             return AjaxResult.success(response);
         } catch (Exception e) {
-            // 记录失败日志
             long duration = System.currentTimeMillis() - startTime;
             auditLog.setResponseTime(duration);
             auditLog.setStatus(0);
@@ -98,7 +85,7 @@ public class AiController extends BaseController {
             auditLogMapper.insert(auditLog);
 
             log.error("聊天处理异常: mode={}", mode, e);
-            throw e; // 交给全局异常处理器
+            throw e;
         }
     }
 }
