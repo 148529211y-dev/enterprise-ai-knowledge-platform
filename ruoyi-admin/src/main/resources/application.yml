@@ -149,16 +149,22 @@ xss:
 # ========== AI 智能模块配置 ==========
 ai:
   # 模式: deepseek(云端API) / ollama(本地模型)
-  provider: deepseek
-  # DeepSeek API 地址（OpenAI兼容格式）
-  base-url: https://api.deepseek.com
-  # API Key（替换成你自己的）
-  api-key: ${DEEPSEEK_API_KEY:sk-your-api-key-here}
-  # 聊天模型
-  chat-model: deepseek-chat
-  # Embedding模型（DeepSeek暂用兼容模型）
-  embedding-model: text-embedding-v3
-  # 向量维度
-  embedding-dimension: 1024
+  provider: ollama
+  # Ollama 本地地址
+  base-url: http://localhost:11434
+  # Ollama 不需要 API Key
+  api-key: ""
+  # 聊天模型（支持 Function Calling）
+  chat-model: qwen2.5:7b
+  # Embedding 模型
+  embedding-model: nomic-embed-text
+  # 向量维度（nomic-embed-text 输出768维）
+  embedding-dimension: 768
   # 对话历史最大轮数
   max-context-messages: 20
+  # RAG 配置
+  rag:
+    top-k: 3
+    similarity-threshold: 0.3
+    temperature: 0.3
+    max-tokens: 2048
