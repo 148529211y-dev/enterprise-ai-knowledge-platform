@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.WfInstanceMapper">
+
+    <insert id="insert" parameterType="com.ruoyi.ai.entity.WfInstance" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO wf_instance (workflow_id, workflow_type, status, current_node, context_json, create_by, create_time)
+        VALUES (#{workflowId}, #{workflowType}, #{status}, #{currentNode}, #{contextJson}, #{createBy}, sysdate())
+    </insert>
+
+    <select id="selectByWorkflowId" resultType="com.ruoyi.ai.entity.WfInstance">
+        SELECT * FROM wf_instance WHERE workflow_id = #{workflowId}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE wf_instance SET status=#{status}, current_node=#{currentNode}, context_json=#{contextJson}, update_time=sysdate()
+        WHERE workflow_id=#{workflowId}
+    </update>
+
+</mapper>

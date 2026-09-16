@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.WfTaskMapper">
+
+    <insert id="insert" parameterType="com.ruoyi.ai.entity.WfTask" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO wf_task (workflow_id, node_name, status, input_json, start_time)
+        VALUES (#{workflowId}, #{nodeName}, #{status}, #{inputJson}, sysdate())
+    </insert>
+
+    <update id="updateResult">
+        UPDATE wf_task SET status=#{status}, output_json=#{outputJson}, error_message=#{errorMessage}, end_time=sysdate(), duration_ms=#{durationMs}
+        WHERE id=#{id}
+    </update>
+
+    <select id="selectByWorkflowId" resultType="com.ruoyi.ai.entity.WfTask">
+        SELECT * FROM wf_task WHERE workflow_id = #{workflowId} ORDER BY id
+    </select>
+
+</mapper>

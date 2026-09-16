@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.ai.mapper.BizProjectMapper">
+
+    <select id="selectById" resultType="com.ruoyi.ai.entity.BizProject">
+        SELECT * FROM biz_project WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultType="com.ruoyi.ai.entity.BizProject">
+        SELECT * FROM biz_project ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByName" resultType="com.ruoyi.ai.entity.BizProject">
+        SELECT * FROM biz_project WHERE project_name LIKE CONCAT('%', #{projectName}, '%')
+    </select>
+
+</mapper>
